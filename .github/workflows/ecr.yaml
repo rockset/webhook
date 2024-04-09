@@ -24,7 +24,7 @@ on:
         type: string
       aws_region:
         description: Target AWS Region
-        default: "us-west-2"
+        default: "us-east-1"
         type: string
 
 # concurrency required to avoid terraform lock contention during ECR provisioning
@@ -56,6 +56,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: public
+          aws-region: ${{ inputs.aws_region }}
           registries: ${{ inputs.aws_account_id }}
           mask-password: "true" # see: https://github.com/aws-actions/amazon-ecr-login#docker-credentials
 
