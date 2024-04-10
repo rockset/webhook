@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -51,15 +52,25 @@ type SignatureAuthenticator struct {
 }
 
 func (a *SignatureAuthenticator) Authenticate(req events.LambdaFunctionURLRequest) error {
-	header := "X-Signature"
+	header := "x-signature"
 	if a.Header != "" {
 		header = a.Header
 	}
 
+	header = strings.ToLower(header)
 	signatureFromHeader, ok := req.Headers[header]
 	if !ok {
 		log.Printf("header %s not found", header)
 		return AuthFailedErr
+	}
+
+	if strings.Contains(signatureFromHeader, "=") {
+		parts := strings.SplitN(signatureFromHeader, "=", 2)
+		if len(parts) != 2 {
+			log.Printf("invalid signature format: %s", signatureFromHeader)
+			return AuthFailedErr
+		}
+		signatureFromHeader = parts[1]
 	}
 
 	h := hmac.New(sha256.New, []byte(a.SigningSecret))

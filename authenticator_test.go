@@ -49,9 +49,11 @@ func TestSignatureAuthorization(t *testing.T) {
 		request events.LambdaFunctionURLRequest
 		err     require.ErrorAssertionFunc
 	}{
-		"pass":      {events.LambdaFunctionURLRequest{Headers: map[string]string{"X-Secret": "dc46983557fea127b43af721467eb9b3fde2338fe3e14f51952aa8478c13d355"}, Body: body}, require.NoError},
-		"fail":      {events.LambdaFunctionURLRequest{Headers: map[string]string{"X-Secret": "incorrect"}, Body: body}, require.Error},
-		"no header": {events.LambdaFunctionURLRequest{Headers: map[string]string{}, Body: body}, require.Error},
+		// x-hub-signature-256: sha256=dc46983557fea127b43af721467eb9b3fde2338fe3e14f51952aa8478c13d355
+		"pass":        {events.LambdaFunctionURLRequest{Headers: map[string]string{"x-secret": "dc46983557fea127b43af721467eb9b3fde2338fe3e14f51952aa8478c13d355"}, Body: body}, require.NoError},
+		"pass with =": {events.LambdaFunctionURLRequest{Headers: map[string]string{"x-secret": "sha256=dc46983557fea127b43af721467eb9b3fde2338fe3e14f51952aa8478c13d355"}, Body: body}, require.NoError},
+		"fail":        {events.LambdaFunctionURLRequest{Headers: map[string]string{"x-secret": "incorrect"}, Body: body}, require.Error},
+		"no header":   {events.LambdaFunctionURLRequest{Headers: map[string]string{}, Body: body}, require.Error},
 	}
 
 	auth := &webhook.SignatureAuthenticator{
