@@ -7,6 +7,9 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/rockset/rockset-go-client"
 	"github.com/rockset/rockset-go-client/openapi"
 )
@@ -25,31 +28,48 @@ type Handler struct {
 	Rockset Rockset
 	// Workspace is the default workspace to use if not specified in the path
 	Workspace string
-	// Paths is a map of paths to locations (workspace and collection, where workspace is optional)
-	Paths Paths
+	// Configs is a map of endpoint configurations
+	Configs Configs
+	// Debug is a flag to enable debug logging
+	Debug bool
 }
 
-type Paths map[string]Location
+type Configs map[string]Config
 
-type Location struct {
-	Workspace  string `json:"workspace"`
-	Collection string `json:"collection"`
+type Config struct {
+	Workspace  string     `json:"workspace"`
+	Collection string     `json:"collection"`
+	Auth       AuthConfig `json:"auth"`
 }
 
-func New(env func(string) (string, error)) (*Handler, error) {
-	workspace, err := env("WORKSPACE")
-	if err != nil {
+type AuthConfig struct {
+	// Type is the type of authentication to use, one of "header" or "signature"
+	Type   string `json:"type"`
+	Secret string `json:"secret"`
+	Header string `json:"header"`
+}
+
+func New(env func(string) (string, bool)) (*Handler, error) {
+	workspace, found := env("WORKSPACE")
+	if !found {
+		return nil, fmt.Errorf("missing required environment variable WORKSPACE")
+	}
+
+	var raw, path string
+	var err error
+	raw, found = env("CONFIG")
+	if !found {
+		if path, found = env("CONFIG_PATH"); !found {
+			return nil, fmt.Errorf("missing required environment variable CONFIG or CONFIG_PATH")
+		}
+		raw, err = LoadConfig(context.Background(), path)
+	}
+	var configs Configs
+	if err := json.Unmarshal([]byte(raw), &configs); err != nil {
 		return nil, err
 	}
 
-	raw, err := env("PATHS")
-	if err != nil {
-		return nil, err
-	}
-	var paths Paths
-	if err := json.Unmarshal([]byte(raw), &paths); err != nil {
-		return nil, err
-	}
+	_, debug := env("DEBUG")
 
 	// this reads ROCKSET_APIKEY & ROCKSET_APISERVER from the environment
 	rc, err := rockset.NewClient()
@@ -60,14 +80,56 @@ func New(env func(string) (string, error)) (*Handler, error) {
 	return &Handler{
 		Rockset:   rc,
 		Workspace: workspace,
-		Paths:     paths,
+		Configs:   configs,
+		Debug:     debug,
 	}, nil
+}
+
+func LoadConfig(ctx context.Context, path string) (string, error) {
+	cfg, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	client := ssm.NewFromConfig(cfg)
+	input := &ssm.GetParameterInput{
+		Name:           &path,
+		WithDecryption: aws.Bool(true),
+	}
+
+	resp, err := client.GetParameter(ctx, input)
+	if err != nil {
+		return "", err
+	}
+
+	return *resp.Parameter.Value, nil
 }
 
 var (
 	BadDocumentErr = fmt.Errorf("failed to add document")
 	MissingPathErr = fmt.Errorf("missing path configuration")
 )
+
+func (h Handler) AuthenticatorForRequest(path string) Authenticator {
+	cfg, found := h.Configs[path]
+	if !found {
+		return &NoopAuthenticator{}
+	}
+
+	switch cfg.Auth.Type {
+	case "header":
+		return &HeaderAuthenticator{
+			Header: cfg.Auth.Header,
+			Secret: cfg.Auth.Secret,
+		}
+	case "signature":
+		return &SignatureAuthenticator{
+			SigningSecret: cfg.Auth.Secret,
+		}
+	default:
+		return &NoopAuthenticator{}
+	}
+}
 
 func (h Handler) HandlePayload(ctx context.Context, request events.LambdaFunctionURLRequest) error {
 	var body string
@@ -82,20 +144,32 @@ func (h Handler) HandlePayload(ctx context.Context, request events.LambdaFunctio
 		body = request.Body
 	}
 
-	// TODO get collection from request path
-	loc, found := h.Paths[request.RawPath]
+	if h.Debug {
+		for k, v := range request.Headers {
+			fmt.Printf("%s: %s\n", k, v)
+		}
+		fmt.Printf("Body: %s\n", body)
+	}
+
+	cfg, found := h.Configs[request.RawPath]
 	if !found {
 		return fmt.Errorf("%s: %w", request.RawPath, MissingPathErr)
 	}
 
-	var workspace string
-	if loc.Workspace == "" {
-		workspace = h.Workspace
-	} else {
-		workspace = loc.Workspace
+	// authenticate
+	auth := h.AuthenticatorForRequest(request.RawPath)
+	if err := auth.Authenticate(request); err != nil {
+		return fmt.Errorf("failed to authenticate: %w", err)
 	}
 
-	result, err := h.Rockset.AddDocumentsRaw(ctx, workspace, loc.Collection, json.RawMessage(body))
+	var workspace string
+	if cfg.Workspace == "" {
+		workspace = h.Workspace
+	} else {
+		workspace = cfg.Workspace
+	}
+
+	result, err := h.Rockset.AddDocumentsRaw(ctx, workspace, cfg.Collection, json.RawMessage(body))
 	if err != nil {
 		return fmt.Errorf("failed to add documents: %w", err)
 	}

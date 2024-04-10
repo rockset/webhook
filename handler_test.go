@@ -20,7 +20,7 @@ import (
 
 type TestCase struct {
 	defaultWorkspace   string
-	config             webhook.Paths
+	config             webhook.Configs
 	request            events.LambdaFunctionURLRequest
 	response           []openapi.DocumentStatus
 	expectedWorkspace  string
@@ -39,7 +39,7 @@ var tests = map[string]TestCase{
 		expectedWorkspace:  "workspace",
 		expectedCollection: "collection",
 		defaultWorkspace:   "commons",
-		config: webhook.Paths{
+		config: webhook.Configs{
 			"/path": {
 				Workspace:  "workspace",
 				Collection: "collection",
@@ -60,7 +60,7 @@ var tests = map[string]TestCase{
 		expectedWorkspace:  "workspace",
 		expectedCollection: "collection",
 		defaultWorkspace:   "workspace",
-		config: webhook.Paths{
+		config: webhook.Configs{
 			"/path": {
 				Collection: "collection",
 			},
@@ -81,7 +81,7 @@ var tests = map[string]TestCase{
 		expectedWorkspace:  "workspace",
 		expectedCollection: "collection",
 		defaultWorkspace:   "workspace",
-		config: webhook.Paths{
+		config: webhook.Configs{
 			"/path": {
 				Workspace:  "workspace",
 				Collection: "collection",
@@ -99,7 +99,7 @@ var tests = map[string]TestCase{
 		expectedWorkspace:  "workspace",
 		expectedCollection: "collection",
 		defaultWorkspace:   "workspace",
-		config: webhook.Paths{
+		config: webhook.Configs{
 			"/path": {
 				Workspace:  "workspace",
 				Collection: "collection",
@@ -126,7 +126,7 @@ func TestHandler_HandlePayload(t *testing.T) {
 			h := webhook.Handler{
 				Rockset:   rc,
 				Workspace: tst.defaultWorkspace,
-				Paths:     tst.config,
+				Configs:   tst.config,
 			}
 
 			err := h.HandlePayload(ctx, tst.request)
@@ -141,7 +141,7 @@ func TestHandler_HandlePayload(t *testing.T) {
 
 func TestFoo(t *testing.T) {
 	x := `{"/path": {"workspace": "workspace", "collection": "collection"}}`
-	var paths webhook.Paths
+	var paths webhook.Configs
 	err := json.Unmarshal([]byte(x), &paths)
 	assert.NoError(t, err)
 	assert.Contains(t, paths, "/path")
@@ -193,7 +193,7 @@ func TestHandler_HandlePayload_integration(t *testing.T) {
 			h := webhook.Handler{
 				Rockset:   rc,
 				Workspace: tst.defaultWorkspace,
-				Paths:     tst.config,
+				Configs:   tst.config,
 			}
 			err := h.HandlePayload(ctx, tst.request)
 			if tst.wantErr != nil {

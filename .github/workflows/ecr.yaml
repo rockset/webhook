@@ -28,7 +28,13 @@ jobs:
           role-to-assume: arn:aws:iam::216690786812:role/github-actions
           aws-region: "us-east-1"
 
-      - name: Login to Amazon ECR
+      - name: Build image
+        id: build-publish
+        shell: bash
+        run: |
+          docker build -t rockset/filebeat:latest .
+
+      - name: Login to Amazon ECR (public)
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
         with:
@@ -37,7 +43,7 @@ jobs:
           registries: 216690786812
           mask-password: "true"
 
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Tag, and push image to Amazon ECR (public)
         id: build-publish
         shell: bash
         env:
@@ -45,5 +51,25 @@ jobs:
           ECR_REPOSITORY: ${{ github.repository }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker build -t public.ecr.aws/r8t4f8i3/rockset/filebeat:latest .
-          docker push public.ecr.aws/r8t4f8i3/rockset/filebeat:latest
+          docker tag rockset/filebeat:latest public.ecr.aws/r8t4f8i3/rockset/webhook:latest
+          docker push public.ecr.aws/r8t4f8i3/rockset/webhook:latest
+
+      - name: Login to Amazon ECR (private)
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: private
+          aws-region: "us-east-1"
+          registries: 216690786812
+          mask-password: "true"
+
+      - name: Tag, and push image to Amazon ECR (private)
+        id: build-publish
+        shell: bash
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ github.repository }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          docker tag rockset/filebeat:latest 216690786812.dkr.ecr.us-east-1.amazonaws.com/rockset/webhook:latest
+          docker push 216690786812.dkr.ecr.us-east-1.amazonaws.com/rockset/webhook:latest
