@@ -45,5 +45,5 @@ jobs:
           ECR_REPOSITORY: ${{ github.repository }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker build -t public.ecr.aws/r8t4f8i3/filebeat:latest .
-          docker push public.ecr.aws/r8t4f8i3/filebeat:latest
+          docker build -t public.ecr.aws/r8t4f8i3/rockset/filebeat:latest .
+          docker push public.ecr.aws/r8t4f8i3/rockset/filebeat:latest
