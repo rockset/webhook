@@ -2,10 +2,22 @@ name: Docker image build and publish
 on:
   workflow_dispatch:
     inputs:
+      image_name:
+        description: Name of the image.
+        type: string
+        default: rockset/webhook
       image_tag:
         description: Tag to apply to images.
         type: string
-        default: test
+        default: latest
+      region:
+        description: AWS region.
+        type: string
+        default: us-east-1
+      account:
+        description: AWS account.
+        type: string
+        default: 216690786812
 
 jobs:
   docker:
@@ -29,47 +41,50 @@ jobs:
           aws-region: "us-east-1"
 
       - name: Build image
-        id: build-publish
+        id: build
         shell: bash
+        env:
+          IMAGE_NAME: ${{ inputs.image_name }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker build -t rockset/filebeat:latest .
+          docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .
 
       - name: Login to Amazon ECR (public)
-        id: login-ecr
+        id: login-ecr-public
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: public
-          aws-region: "us-east-1"
-          registries: 216690786812
+          aws-region: ${{ inputs.region }}
+          registries: ${{ inputs.account }}
           mask-password: "true"
 
       - name: Tag, and push image to Amazon ECR (public)
-        id: build-publish
+        id: publish-public
         shell: bash
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ github.repository }}
+          ECR_REGISTRY: ${{ steps.login-ecr-public.outputs.registry }}
+          IMAGE_NAME: ${{ inputs.image_name }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker tag rockset/filebeat:latest public.ecr.aws/r8t4f8i3/rockset/webhook:latest
-          docker push public.ecr.aws/r8t4f8i3/rockset/webhook:latest
+          docker tag ${IMAGE_NAME}:${IMAGE_TAG} public.ecr.aws/r8t4f8i3/${IMAGE_NAME}:${IMAGE_TAG}
+          docker push public.ecr.aws/r8t4f8i3/${IMAGE_NAME}:${IMAGE_TAG}
 
       - name: Login to Amazon ECR (private)
-        id: login-ecr
+        id: login-ecr-private
         uses: aws-actions/amazon-ecr-login@v2
         with:
           registry-type: private
-          aws-region: "us-east-1"
-          registries: 216690786812
+          aws-region: ${{ inputs.region }}
+          registries: ${{ inputs.account }}
           mask-password: "true"
 
       - name: Tag, and push image to Amazon ECR (private)
-        id: build-publish
+        id: publish-private
         shell: bash
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ github.repository }}
+          ECR_REGISTRY: ${{ steps.login-ecr-private.outputs.registry }}
+          IMAGE_NAME: ${{ inputs.image_name }}
           IMAGE_TAG: ${{ inputs.image_tag }}
         run: |
-          docker tag rockset/filebeat:latest 216690786812.dkr.ecr.us-east-1.amazonaws.com/rockset/webhook:latest
-          docker push 216690786812.dkr.ecr.us-east-1.amazonaws.com/rockset/webhook:latest
+          docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${ECR_REGISTRY}/${IMAGE_NAME}:${IMAGE_TAG}"
