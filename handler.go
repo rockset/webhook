@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -113,10 +114,13 @@ var (
 func (h Handler) AuthenticatorForRequest(path string) Authenticator {
 	cfg, found := h.Configs[path]
 	if !found {
-		return &NoopAuthenticator{}
+		log.Printf("no config found for %s", path)
+		return &FailAuthenticator{}
 	}
 
 	switch cfg.Auth.Type {
+	case "noop":
+		return &NoopAuthenticator{}
 	case "header":
 		return &HeaderAuthenticator{
 			Header: cfg.Auth.Header,
@@ -127,7 +131,8 @@ func (h Handler) AuthenticatorForRequest(path string) Authenticator {
 			SigningSecret: cfg.Auth.Secret,
 		}
 	default:
-		return &NoopAuthenticator{}
+		log.Printf("unknown auth type %s", cfg.Auth.Type)
+		return &FailAuthenticator{}
 	}
 }
 

@@ -43,6 +43,7 @@ var tests = map[string]TestCase{
 			"/path": {
 				Workspace:  "workspace",
 				Collection: "collection",
+				Auth:       webhook.AuthConfig{Type: "noop"},
 			},
 		},
 		request: events.LambdaFunctionURLRequest{
@@ -63,6 +64,7 @@ var tests = map[string]TestCase{
 		config: webhook.Configs{
 			"/path": {
 				Collection: "collection",
+				Auth:       webhook.AuthConfig{Type: "noop"},
 			},
 		},
 		request: events.LambdaFunctionURLRequest{
@@ -85,6 +87,7 @@ var tests = map[string]TestCase{
 			"/path": {
 				Workspace:  "workspace",
 				Collection: "collection",
+				Auth:       webhook.AuthConfig{Type: "noop"},
 			},
 		},
 		request: events.LambdaFunctionURLRequest{
@@ -103,6 +106,7 @@ var tests = map[string]TestCase{
 			"/path": {
 				Workspace:  "workspace",
 				Collection: "collection",
+				Auth:       webhook.AuthConfig{Type: "noop"},
 			},
 		},
 		request: events.LambdaFunctionURLRequest{
