@@ -190,6 +190,7 @@ func (h Handler) HandlePayload(ctx context.Context, request events.LambdaFunctio
 	}
 
 	if cfg.WrapPayloadInArray {
+		log.Printf("wrapping payload in [...]")
 		body = fmt.Sprintf("[%s]", body)
 	}
 
