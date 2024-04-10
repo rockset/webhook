@@ -51,9 +51,14 @@ type AuthConfig struct {
 }
 
 func New(env func(string) (string, bool)) (*Handler, error) {
+	_, debug := env("DEBUG")
+
 	workspace, found := env("WORKSPACE")
 	if !found {
 		return nil, fmt.Errorf("missing required environment variable WORKSPACE")
+	}
+	if debug {
+		log.Printf("workspace: %s", workspace)
 	}
 
 	var raw, path string
@@ -64,13 +69,21 @@ func New(env func(string) (string, bool)) (*Handler, error) {
 			return nil, fmt.Errorf("missing required environment variable CONFIG or CONFIG_PATH")
 		}
 		raw, err = LoadConfig(context.Background(), path)
+		if err != nil {
+			return nil, err
+		}
 	}
+	if debug {
+		log.Printf("raw config: %s", raw)
+	}
+
 	var configs Configs
 	if err := json.Unmarshal([]byte(raw), &configs); err != nil {
 		return nil, err
 	}
-
-	_, debug := env("DEBUG")
+	if debug {
+		log.Printf("parsed config: %+v", configs)
+	}
 
 	// this reads ROCKSET_APIKEY & ROCKSET_APISERVER from the environment
 	rc, err := rockset.NewClient()
