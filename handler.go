@@ -38,9 +38,10 @@ type Handler struct {
 type Configs map[string]Config
 
 type Config struct {
-	Workspace  string     `json:"workspace"`
-	Collection string     `json:"collection"`
-	Auth       AuthConfig `json:"auth"`
+	Workspace          string     `json:"workspace"`
+	Collection         string     `json:"collection"`
+	WrapPayloadInArray bool       `json:"wrap"`
+	Auth               AuthConfig `json:"auth"`
 }
 
 type AuthConfig struct {
@@ -186,6 +187,10 @@ func (h Handler) HandlePayload(ctx context.Context, request events.LambdaFunctio
 		workspace = h.Workspace
 	} else {
 		workspace = cfg.Workspace
+	}
+
+	if cfg.WrapPayloadInArray {
+		body = fmt.Sprintf("[%s]", body)
 	}
 
 	result, err := h.Rockset.AddDocumentsRaw(ctx, workspace, cfg.Collection, json.RawMessage(body))
