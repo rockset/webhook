@@ -141,6 +141,7 @@ func (h Handler) AuthenticatorForRequest(path string) Authenticator {
 		}
 	case "signature":
 		return &SignatureAuthenticator{
+			Header:        cfg.Auth.Header,
 			SigningSecret: cfg.Auth.Secret,
 		}
 	default:
