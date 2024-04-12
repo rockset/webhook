@@ -116,6 +116,7 @@ func LoadConfig(ctx context.Context, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Printf("loaded config from %s: v%d", path, resp.Parameter.Version)
 
 	return *resp.Parameter.Value, nil
 }
